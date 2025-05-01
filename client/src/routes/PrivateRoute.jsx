@@ -16,4 +16,4 @@ PrivateRoute.propTypes = {
   children: PropTypes.element,
 }
 
-export default PrivateRoute
+export default PrivateRoute;
