@@ -1,4 +1,13 @@
 const AddPlantForm = () => {
+ const handleSubmit = (e) =>{
+  e.preventDefault();
+  const form =  e.target;
+  const  name=form.name.value
+  const category=form.category.value
+  const description= form.description.value
+  const price= parseInt(form.price.value)
+  const quantity=parseInt(form.quantity.vale)
+ } 
   return (
     <div className='w-full min-h-[calc(100vh-40px)] flex flex-col justify-center items-center text-gray-800 rounded-xl bg-gray-50'>
       <form>
@@ -83,7 +92,7 @@ const AddPlantForm = () => {
             </div>
             {/* Image */}
             <div className=' p-4  w-full  m-auto rounded-lg flex-grow'>
-              <div className='file_upload px-5 py-3 relative border-4 border-dotted border-gray-300 rounded-lg'>
+              <div className='file_upload px-5 py-5 relative border-4 border-dotted border-gray-300 rounded-lg'>
                 <div className='flex flex-col w-max mx-auto text-center'>
                   <label>
                     <input
@@ -103,7 +112,7 @@ const AddPlantForm = () => {
             </div>
 
             {/* Submit Button */}
-            <button
+            <button onClick={()=>handleSubmit}
               type='submit'
               className='w-full p-3 mt-5 text-center font-medium text-white transition duration-200 rounded shadow-md bg-lime-500 '
             >

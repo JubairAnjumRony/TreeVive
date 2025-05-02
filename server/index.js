@@ -48,25 +48,43 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
-    const db = client.db('TreeVive')
-    const userCollection = db.collection('users')
+    const db = client.db("TreeVive");
+    const userCollection = db.collection("users");
 
     // save or update a user in db
-    app.post('/users/:email',async(req,res) =>{
-      const email =req.params.email
-      const query = {email}
-      const user = req.body
-      //check if  user exist in db
+    // app.post('/users/:email',async(req,res) =>{
+    //   const email =req.params.email
+    //   const query = {email}
+    //   const  user = req.body
+    //   console.log({user});
+    //   //check if  user exist in db
+    //   const isExist = await userCollection.findOne(query)
+    //   if(isExist){
+    //     return res.send(isExist)
+    //   }
+    //   const result  = await userCollection.insertOne({
+    //     ...user,
+    //     role:'customer',
+    //     timestamp: Date.now(),})
+    //   res.send(result);
+    // })
+    app.post("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = req.body;
+      // check if user exists in db
       const isExist = await userCollection.findOne(query);
-      if(isExist){
-        return res.send(isExist)
+      if (isExist) {
+        return res.send(isExist);
       }
-      const result  = await userCollection.insertOne({...user,
-        role:'customer',
-        timestamp: Date.now()});
+      const result = await userCollection.insertOne({
+        ...user,
+        role: "customer",
+        timestamp: Date.now(),
+      });
       res.send(result);
-    })
-    
+    });
+
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
@@ -80,8 +98,8 @@ async function run() {
           sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
         .send({ success: true });
-        if(!email?.email)
-          return res.status(400).send({error:"Email required"});
+      if (!email?.email)
+        return res.status(400).send({ error: "Email required" });
     });
     // Logout
     app.get("/logout", async (req, res) => {
