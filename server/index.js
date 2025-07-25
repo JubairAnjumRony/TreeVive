@@ -49,7 +49,9 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const db = client.db("TreeVive");
-    const userCollection = db.collection("users");
+    const usersCollection = db.collection("users");
+    const plantsCollection = db.collection("plants");
+    const ordersCollection = db.collection("orders");
 
     // save or update a user in db
     // app.post('/users/:email',async(req,res) =>{
@@ -73,11 +75,11 @@ async function run() {
       const query = { email };
       const user = req.body;
       // check if user exists in db
-      const isExist = await userCollection.findOne(query);
+      const isExist = await usersCollection.findOne(query);
       if (isExist) {
         return res.send(isExist);
       }
-      const result = await userCollection.insertOne({
+      const result = await usersCollection.insertOne({
         ...user,
         role: "customer",
         timestamp: Date.now(),
@@ -116,6 +118,51 @@ async function run() {
       }
     });
 
+    app.post('/plants', verifyToken, async (req,res) =>{
+      const plant = req.body;
+      const result =await plantsCollection.insertOne(plant);
+      res.send(result);
+    })
+
+    app.get ('/plants', async (req,res) =>{
+     const result = await plantsCollection.find().limit(12).toArray()
+     res.send(result)
+    })
+    // get a plant by id
+    app.get("/plants/:id",async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+        const result = await plantsCollection.findOne(query);
+        res.send(result);
+      }
+    )
+
+    //save order data in db
+    app.post('/order',verifyToken,async(req,res)=>{
+      const orderInfo = req.body
+      console.log(orderInfo)
+      const result = await ordersCollection.insertOne(orderInfo)
+      res.send(result)
+    })
+
+    //Manage plant quantify
+    app.patch('/plants/quantify/:id',verifyToken,async(req,res)=>{
+      const id = req.params.id
+      const {quantifyToUpdate,status} = req.body
+      const filter = {_id: new ObjectId(id)}
+      let updatedDoc ={
+        $inc:{quantity: -quantifyToUpdate},
+      }
+      if(status==='increase'){
+        updatedDoc = {
+         $inc: {qunatity: quantifyToUpdate},
+        }
+      }
+      const result = await plantsCollection.updateOne(filter,updatedDoc)
+
+      res.send(result);
+    })
+    
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(

@@ -9,7 +9,7 @@ const SignUp = () => {
   const { createUser, updateUserProfile, signInWithGoogle, loading } = useAuth()
   const navigate = useNavigate()
   // form submit handler
-  const handleSubmit = async event => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     const form = event.target
     const name = form.name.value
@@ -21,28 +21,26 @@ const SignUp = () => {
     // formData.append('image',image)
 
     // 1.send image data to imgbbb
-    const image_url = await imageUpload(image)
     // const {data} =await axios.post(
-    //   `https://api.imgbb.com/1/upload?key=${
-    //     import.meta.env.VITE_IMGBB_API_KEY
-    //   }`,
-    //   formData
+      //   `https://api.imgbb.com/1/upload?key=${
+        //     import.meta.env.VITE_IMGBB_API_KEY
+        //   }`,
+        //   formData
+        
+        // )
+        
+        //  const image_url = data.data.display_url;
 
-    // )
+        const image_url = await imageUpload(image)
 
-    //  const image_url = data.data.display_url;
-    try {
+
+        try {
       //2. User Registration
-      const result = await createUser(email, password)
+      const result = await createUser(email, password);
 
       //3. Save username & profile photo
-      await updateUserProfile(
-     name,
-       image_url
-        // photoURL:photo}
-      )
-      console.log(result)
-
+      await updateUserProfile( name, image_url) ;
+      console.log("new cretaed user -->",result)
       navigate('/')
       toast.success('Signup Successful')
     } catch (err) {

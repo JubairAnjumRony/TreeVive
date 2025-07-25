@@ -1,16 +1,11 @@
-const AddPlantForm = () => {
- const handleSubmit = (e) =>{
-  e.preventDefault();
-  const form =  e.target;
-  const  name=form.name.value
-  const category=form.category.value
-  const description= form.description.value
-  const price= parseInt(form.price.value)
-  const quantity=parseInt(form.quantity.vale)
- } 
+import PropTypes from "prop-types";
+import { TbFidgetSpinner } from "react-icons/tb";
+
+const AddPlantForm = ({handleSubmit, uploadButtonText,setUploadButtonText,loading}) => {
+
   return (
     <div className='w-full min-h-[calc(100vh-40px)] flex flex-col justify-center items-center text-gray-800 rounded-xl bg-gray-50'>
-      <form>
+      <form onSubmit={handleSubmit}>
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-10'>
           <div className='space-y-6'>
             {/* Name */}
@@ -96,6 +91,10 @@ const AddPlantForm = () => {
                 <div className='flex flex-col w-max mx-auto text-center'>
                   <label>
                     <input
+                      onChange = {e => setUploadButtonText({
+                        image:e.target.files[0],
+                        url: URL.createObjectURL(e.target.files[0]),
+                      })}
                       className='text-sm cursor-pointer w-36 hidden'
                       type='file'
                       name='image'
@@ -104,25 +103,45 @@ const AddPlantForm = () => {
                       hidden
                     />
                     <div className='bg-lime-500 text-white border border-gray-300 rounded font-semibold cursor-pointer p-1 px-3 hover:bg-lime-500'>
-                      Upload
+                     {uploadButtonText?.image?.name}
                     </div>
                   </label>
                 </div>
               </div>
             </div>
+            {
+                  uploadButtonText && uploadButtonText?.image?.size && 
+                  (
+                   <div className=" flex items-center gap-5">
+                    <img className="w-20" src={uploadButtonText?.url} alt="" />
+                       <p>Image size: {parseInt(uploadButtonText?.image?.size/1024)} KB</p>
+                    </div>
+                  )
+                }
 
             {/* Submit Button */}
-            <button onClick={()=>handleSubmit}
+            <button 
               type='submit'
               className='w-full p-3 mt-5 text-center font-medium text-white transition duration-200 rounded shadow-md bg-lime-500 '
             >
-              Save & Continue
+              {loading ? (
+                <TbFidgetSpinner className="animate-spin m-auto"></TbFidgetSpinner>
+              ):
+            ( ' Save & Continue')
+            }
             </button>
           </div>
         </div>
       </form>
     </div>
   )
+}
+AddPlantForm.propTypes = {
+  handleSubmit: PropTypes.func.isRequired,
+  uploadButtonText:PropTypes.string,
+  setUploadButtonText:PropTypes.string,
+  loading:PropTypes.bool,
+
 }
 
 export default AddPlantForm
