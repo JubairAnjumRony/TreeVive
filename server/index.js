@@ -118,51 +118,157 @@ async function run() {
       }
     });
 
-    app.post('/plants', verifyToken, async (req,res) =>{
+    app.post("/plants", verifyToken, async (req, res) => {
       const plant = req.body;
-      const result =await plantsCollection.insertOne(plant);
+      const result = await plantsCollection.insertOne(plant);
       res.send(result);
-    })
+    });
 
-    app.get ('/plants', async (req,res) =>{
-     const result = await plantsCollection.find().limit(12).toArray()
-     res.send(result)
-    })
+    app.get("/plants", async (req, res) => {
+      const result = await plantsCollection.find().limit(12).toArray();
+      res.send(result);
+    });
     // get a plant by id
-    app.get("/plants/:id",async(req,res)=>{
+    app.get("/plants/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
-        const result = await plantsCollection.findOne(query);
-        res.send(result);
-      }
-    )
+      const query = { _id: new ObjectId(id) };
+      const result = await plantsCollection.findOne(query);
+      res.send(result);
+    });
 
     //save order data in db
-    app.post('/order',verifyToken,async(req,res)=>{
-      const orderInfo = req.body
-      console.log(orderInfo)
-      const result = await ordersCollection.insertOne(orderInfo)
-      res.send(result)
-    })
+    app.post("/order", verifyToken, async (req, res) => {
+      const orderInfo = req.body;
+      console.log(orderInfo);
+      const result = await ordersCollection.insertOne(orderInfo);
+      res.send(result);
+    });
 
     //Manage plant quantify
-    app.patch('/plants/quantify/:id',verifyToken,async(req,res)=>{
-      const id = req.params.id
-      const {quantifyToUpdate,status} = req.body
-      const filter = {_id: new ObjectId(id)}
-      let updatedDoc ={
-        $inc:{quantity: -quantifyToUpdate},
-      }
-      if(status==='increase'){
+    app.patch("/plants/quantify/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const { quantifyToUpdate, status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      let updatedDoc = {
+        $inc: { quantity: -quantifyToUpdate },
+      };
+      if (status === "increase") {
         updatedDoc = {
-         $inc: {qunatity: quantifyToUpdate},
-        }
+          $inc: { quantity: quantifyToUpdate },
+        };
       }
-      const result = await plantsCollection.updateOne(filter,updatedDoc)
+      const result = await plantsCollection.updateOne(filter, updatedDoc);
 
       res.send(result);
-    })
-    
+    });
+    //get all orders from a specific customer
+    app.get("/customer-orders/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const result = await ordersCollection
+          .aggregate([
+            {
+              $match: { "customer.email": email },
+            },
+            {
+              $addFields: {
+                plantId: { $toObjectId: "$plantId" },
+              },
+            },
+            {
+              $lookup: {
+                from: "plants",
+                localField: "plantId",
+                foreignField: "_id",
+                as: "plants",
+              },
+            },
+
+            { $unwind: "$plants" }, // unwind lookup result, return without array
+            {
+              $addFields: {
+                // add these fields in order object
+                name: "$plants.name",
+                image: "$plants.image",
+                category: "$plants.category",
+              },
+            },
+            {
+              // remove plants object property from order object
+              $project: {
+                plants: 0,
+              },
+            },
+          ])
+          .toArray();
+
+        if (result.length === 0) {
+          return res.status(404).json({ message: "No orders found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error in /customer-orders/:email route", error);
+        res.status(500).json({ message: "Server error", error });
+      }
+    });
+
+    // delete orders
+    app.delete("/orders/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const order = await ordersCollection.findOne(query);
+      // if (order.status === "Delivered")
+      //   return res
+      //     .status(409)
+      //     .send("cannot cancel once the product is delivered!");
+
+      const result = await ordersCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // app.get("/customer-orders/:email", verifyToken, async (req, res) => {
+    //   const email = req.params.email;
+    //   const result = await ordersCollection
+    //     .aggregate([
+    //       {
+    //         $match: { "customer.email": email }, //Match specific customers data only by email
+    //       },
+    //       {
+    //         $addFields: {
+    //           plantId: { $toObjectId: "$plantId" }, //convert plantId string field to objectId field
+    //         },
+    //       },
+    //       {
+    //         $lookup: {
+    //           // go to a different collection and look for data
+    //           from: "plants", // collection name
+    //           localField: "plantId", // local data that you want to match
+    //           foreignField: "_id", // foreign field name of that same data
+    //           as: "plants", // return the data as plants array (array naming)
+    //         },
+    //       },
+    //       { $unwind: "$plants" }, // unwind lookup result, return without array
+    //       {
+    //         $addFields: {
+    //           // add these fields in order object
+    //           name: "$plants.name",
+    //           image: "$plants.image",
+    //           category: "$plants.category",
+    //         },
+    //       },
+    //       {
+    //         // remove plants object property from order object
+    //         $project: {
+    //           plants: 0,
+    //         },
+    //       },
+    //     ])
+    //     .toArray();
+
+    //   res.send(result);
+    // });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
