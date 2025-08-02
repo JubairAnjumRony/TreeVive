@@ -138,8 +138,8 @@ const AddPlantForm = ({handleSubmit, uploadButtonText,setUploadButtonText,loadin
 }
 AddPlantForm.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
-  uploadButtonText:PropTypes.string,
-  setUploadButtonText:PropTypes.string,
+  uploadButtonText:PropTypes.object,
+  setUploadButtonText:PropTypes.func.isRequired,
   loading:PropTypes.bool,
 
 }

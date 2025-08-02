@@ -2,6 +2,7 @@ import axios from 'axios'
 import useAuth from './useAuth'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LoadingSpinner from '../components/Shared/LoadingSpinner'
 
  const axiosSecure = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -10,7 +11,7 @@ import { useNavigate } from 'react-router-dom'
 
 const useAxiosSecure = () => {
   const navigate = useNavigate()
-  const { logOut } = useAuth()
+  const { logOut,loading } = useAuth()
   useEffect(() => {
     axiosSecure.interceptors.response.use(
       res => {
@@ -21,13 +22,14 @@ const useAxiosSecure = () => {
         if (error.response.status === 401 || error.response.status === 403) {
           // logout
           logOut()
+          if(loading)return <LoadingSpinner/>
           // navigate to login
           navigate('/login')
         }
         return Promise.reject(error)
       }
     )
-  }, [logOut, navigate])
+  }, [logOut, navigate,loading])
   return axiosSecure
 }
 

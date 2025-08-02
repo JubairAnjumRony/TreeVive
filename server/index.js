@@ -9,6 +9,7 @@ const morgan = require("morgan");
 const port = process.env.PORT || 9000;
 const app = express();
 // middleware
+
 const corsOptions = {
   origin: ["http://localhost:5173", "http://localhost:5174"],
   credentials: true,
@@ -53,39 +54,29 @@ async function run() {
     const plantsCollection = db.collection("plants");
     const ordersCollection = db.collection("orders");
 
-    // save or update a user in db
-    // app.post('/users/:email',async(req,res) =>{
-    //   const email =req.params.email
-    //   const query = {email}
-    //   const  user = req.body
-    //   console.log({user});
-    //   //check if  user exist in db
-    //   const isExist = await userCollection.findOne(query)
-    //   if(isExist){
-    //     return res.send(isExist)
-    //   }
-    //   const result  = await userCollection.insertOne({
-    //     ...user,
-    //     role:'customer',
-    //     timestamp: Date.now(),})
-    //   res.send(result);
-    // })
-    app.post("/users/:email", async (req, res) => {
-      const email = req.params.email;
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.user?.email;
       const query = { email };
-      const user = req.body;
-      // check if user exists in db
-      const isExist = await usersCollection.findOne(query);
-      if (isExist) {
-        return res.send(isExist);
+      const result = await usersCollection.findOne(query);
+      if (!result || result?.role !== "admin") {
+        return res
+          .status(403)
+          .send("unauthorized access,Admins Only Approved!");
       }
-      const result = await usersCollection.insertOne({
-        ...user,
-        role: "customer",
-        timestamp: Date.now(),
-      });
-      res.send(result);
-    });
+      next();
+    };
+
+    const verifySeller = async (req, res, next) => {
+      const email = req.user?.email;
+      const query = { email };
+      const result = await usersCollection.findOne(query);
+      if (!result || result?.role !== "seller") {
+        return res
+          .status(403)
+          .send("unauthorized access,Admins Only Approved!");
+      }
+      next();
+    };
 
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
@@ -103,6 +94,7 @@ async function run() {
       if (!email?.email)
         return res.status(400).send({ error: "Email required" });
     });
+
     // Logout
     app.get("/logout", async (req, res) => {
       try {
@@ -118,7 +110,80 @@ async function run() {
       }
     });
 
-    app.post("/plants", verifyToken, async (req, res) => {
+    //get user role
+    app.get("/users/role/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const result = await usersCollection.findOne({ email });
+      res.send({ role: result?.role });
+    });
+    // save or update a user in db
+    app.post("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = req.body;
+      // check if user exists in db
+      const isExist = await usersCollection.findOne(query);
+      if (isExist) {
+        return res.send(isExist);
+      }
+      const result = await usersCollection.insertOne({
+        ...user,
+        role: "customer",
+        timestamp: Date.now(),
+      });
+      res.send(result);
+    });
+    // request to become a  seller
+    app.patch("/users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user?.status === "Requested") {
+        return res
+          .status(400)
+          .send("You have already Requested, wait for some time");
+      }
+      const updatedDoc = {
+        $set: {
+          status: "Requested",
+        },
+      };
+      const result = await usersCollection.updateOne(user, updatedDoc);
+      res.send(result);
+    });
+
+    //  manage-users
+    app.get(
+      "/manage-users/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: { $ne: email } };
+        const result = await usersCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    // update user role & status
+    app.patch(
+      "/user/role/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const { role } = req.body;
+        const filter = { email };
+        const updateDoc = {
+          $set: { role, status: "Verified" },
+        };
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
+
+    app.post("/plants", verifyToken, verifySeller, async (req, res) => {
       const plant = req.body;
       const result = await plantsCollection.insertOne(plant);
       res.send(result);
@@ -135,6 +200,123 @@ async function run() {
       const result = await plantsCollection.findOne(query);
       res.send(result);
     });
+
+    // get seller plant inventory
+    // app.get("plants/seller", verifyToken, async (req, res) => {
+    //   const email = req.user?.email;
+    //   const result = await plantsCollection
+    //     .find({ 'seller.email': email })
+    //     .toArray();
+    //   res.send(result);
+    // });
+
+    app.get("/pplants/seller", verifyToken, verifySeller, async (req, res) => {
+      const email = req.user.email;
+      const result = await plantsCollection
+        .find({ "seller.email": email })
+        .toArray();
+      res.send(result);
+    });
+
+    //  delete plant from seller inventory
+    app.delete(
+      "/inventory/:id",
+      verifyToken,
+      verifySeller,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await plantsCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
+
+    //manage orders for seller
+    app.get(
+      "/manageOrders/:email",
+      verifyToken,
+      verifySeller,
+      async (req, res) => {
+        try {
+          const email = req.params.email;
+          const result = await ordersCollection
+            .aggregate([
+              {
+                $match: { seller: email },
+              },
+              {
+                $addFields: {
+                  plantId: { $toObjectId: "$plantId" },
+                },
+              },
+              {
+                $lookup: {
+                  from: "plants", //// local data that you want to match
+                  localField: "plantId",
+                  foreignField: "_id",
+                  as: "plants",
+                },
+              },
+
+              { $unwind: "$plants" }, // unwind lookup result, return without array
+              {
+                $addFields: {
+                  // add these fields in order object
+                  name: "$plants.name",
+                  // image: "$plants.image",
+                  // category: "$plants.category",
+                },
+              },
+              {
+                // remove plants object property from order object
+                $project: {
+                  plants: 0,
+                },
+              },
+            ])
+            .toArray();
+
+          // if (result.length === 0) {
+          //   return res.status(404).json({ message: "No orders found" });
+          // }
+
+          res.send(result);
+        } catch (error) {
+          console.error("Error in /customer-orders/:email route", error);
+          res.status(500).json({ message: "Server error", error });
+        }
+      }
+    );
+
+    // update or change order status by seller
+    app.patch("/orders/:id", verifyToken, verifySeller, async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: { status },
+      };
+      const result = await ordersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // cancel or delete orders from seller inventory
+    app.delete(
+      "/sellerOrder/:id",
+      verifyToken,
+      verifySeller,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const order = await ordersCollection.deleteOne(query);
+        if (order.status === "Delivered")
+          return res
+            .status(409)
+            .send("cannot send once the product is deliverd");
+        const result = await ordersCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
 
     //save order data in db
     app.post("/order", verifyToken, async (req, res) => {
@@ -161,6 +343,7 @@ async function run() {
 
       res.send(result);
     });
+
     //get all orders from a specific customer
     app.get("/customer-orders/:email", verifyToken, async (req, res) => {
       try {
@@ -177,7 +360,7 @@ async function run() {
             },
             {
               $lookup: {
-                from: "plants",
+                from: "plants", //// local data that you want to match
                 localField: "plantId",
                 foreignField: "_id",
                 as: "plants",
@@ -218,56 +401,14 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const order = await ordersCollection.findOne(query);
-      // if (order.status === "Delivered")
-      //   return res
-      //     .status(409)
-      //     .send("cannot cancel once the product is delivered!");
+      if (order.status === "Delivered")
+        return res
+          .status(409)
+          .send("cannot cancel once the product is delivered!");
 
       const result = await ordersCollection.deleteOne(query);
       res.send(result);
     });
-
-    // app.get("/customer-orders/:email", verifyToken, async (req, res) => {
-    //   const email = req.params.email;
-    //   const result = await ordersCollection
-    //     .aggregate([
-    //       {
-    //         $match: { "customer.email": email }, //Match specific customers data only by email
-    //       },
-    //       {
-    //         $addFields: {
-    //           plantId: { $toObjectId: "$plantId" }, //convert plantId string field to objectId field
-    //         },
-    //       },
-    //       {
-    //         $lookup: {
-    //           // go to a different collection and look for data
-    //           from: "plants", // collection name
-    //           localField: "plantId", // local data that you want to match
-    //           foreignField: "_id", // foreign field name of that same data
-    //           as: "plants", // return the data as plants array (array naming)
-    //         },
-    //       },
-    //       { $unwind: "$plants" }, // unwind lookup result, return without array
-    //       {
-    //         $addFields: {
-    //           // add these fields in order object
-    //           name: "$plants.name",
-    //           image: "$plants.image",
-    //           category: "$plants.category",
-    //         },
-    //       },
-    //       {
-    //         // remove plants object property from order object
-    //         $project: {
-    //           plants: 0,
-    //         },
-    //       },
-    //     ])
-    //     .toArray();
-
-    //   res.send(result);
-    // });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

@@ -3,7 +3,7 @@ import { FcGoogle } from 'react-icons/fc'
 import useAuth from '../../hooks/useAuth'
 import { toast } from 'react-hot-toast'
 import { TbFidgetSpinner } from 'react-icons/tb'
-import { imageUpload } from '../../api/utils'
+import { imageUpload, saveUser } from '../../api/utils'
 
 const SignUp = () => {
   const { createUser, updateUserProfile, signInWithGoogle, loading } = useAuth()
@@ -20,7 +20,7 @@ const SignUp = () => {
     // const formData = new FormData();
     // formData.append('image',image)
 
-    // 1.send image data to imgbbb
+    
     // const {data} =await axios.post(
       //   `https://api.imgbb.com/1/upload?key=${
         //     import.meta.env.VITE_IMGBB_API_KEY
@@ -30,7 +30,7 @@ const SignUp = () => {
         // )
         
         //  const image_url = data.data.display_url;
-
+    // 1.send image data to imgbbb
         const image_url = await imageUpload(image)
 
 
@@ -41,6 +41,8 @@ const SignUp = () => {
       //3. Save username & profile photo
       await updateUserProfile( name, image_url) ;
       console.log("new cretaed user -->",result)
+      //save userInfo if db if User is new
+        await saveUser({ ...result?.user, displayName: name, image_url })
       navigate('/')
       toast.success('Signup Successful')
     } catch (err) {
@@ -53,8 +55,10 @@ const SignUp = () => {
   const handleGoogleSignIn = async () => {
     try {
       //User Registration using google
-      await signInWithGoogle()
-
+      const data = await signInWithGoogle()
+      // save user to database
+      await saveUser(data?.user)
+    
       navigate('/')
       toast.success('Signup Successful')
     } catch (err) {
