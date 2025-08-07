@@ -5,7 +5,8 @@ const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const morgan = require("morgan");
-
+const nodemailer = require("nodemailer");
+const stripe = require('stripe')(process.env.VITE_STRIPE_SECRETKEY)
 const port = process.env.PORT || 9000;
 const app = express();
 // middleware
@@ -35,6 +36,65 @@ const verifyToken = async (req, res, next) => {
     req.user = decoded;
     next();
   });
+};
+
+
+
+//send email using nodemailer
+const sendEmail = async (emailAddress, emailData) => {
+  //create transporter
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: process.env.NodeMailer_user,
+      pass: process.env.NodeMailer_pass,
+    },
+  });
+  // transporter.verify((error,success)=>{
+  //   if(error){
+  //     console.log(error)
+  //   }
+  //   else{
+  //     console.log('Transporter is ready to emails.', success)
+  //   }
+  //  })
+
+  // const mailBody = {
+  //   from: process.env.NODEMAILER_USER, // sender address
+  //   to: emailAddress, // list of receivers
+  //   subject: emailData?.subject, // Subject line
+  //   html: `<p>${emailData?.message}</p>`, // html body
+  // }
+
+  // // send email
+  // transporter.sendMail(mailBody, (error, info) => {
+  //   if (error) {
+  //     console.log(error)
+  //   } else {
+  //     // console.log(info)
+  //     console.log('Email Sent: ' + info?.response)
+  //   }
+  // })
+  await transporter.verify();
+  console.log("Server is ready to take our messages");
+
+  (async () => {
+    try {
+      const info = await transporter.sendMail({
+        from: process.env.NODEMAILER_USER, // sender address
+        to: emailAddress, // list of receivers
+        subject: emailData?.subject, // Subject line
+        html: `<p>${emailData?.message}</p>`, // html body
+      });
+
+      console.log("Message sent: %s", info.messageId);
+      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    } catch (err) {
+      console.error("Error while sending mail", err);
+    }
+  })();
 };
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uo8ft.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -110,12 +170,6 @@ async function run() {
       }
     });
 
-    //get user role
-    app.get("/users/role/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const result = await usersCollection.findOne({ email });
-      res.send({ role: result?.role });
-    });
     // save or update a user in db
     app.post("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -126,33 +180,36 @@ async function run() {
       if (isExist) {
         return res.send(isExist);
       }
+
+      const emailAddress = req.params.email;
+      const emailData = {
+        subject: "Welcome to our platform",
+        message: `Hello ${
+          req.body.name || "user"
+        }, your account has been created.`,
+      };
+
+      await sendEmail(emailAddress, emailData);
+
       const result = await usersCollection.insertOne({
         ...user,
         role: "customer",
         timestamp: Date.now(),
       });
+
       res.send(result);
     });
-    // request to become a  seller
-    app.patch("/users/:email", verifyToken, async (req, res) => {
+
+    //get user role
+    app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-
-      if (!user || user?.status === "Requested") {
-        return res
-          .status(400)
-          .send("You have already Requested, wait for some time");
-      }
-      const updatedDoc = {
-        $set: {
-          status: "Requested",
-        },
-      };
-      const result = await usersCollection.updateOne(user, updatedDoc);
-      res.send(result);
+      const result = await usersCollection.findOne({ email });
+      res.send({ role: result?.role });
     });
 
+    // Admin Routes/////////////////////////////////////////////////////////////////////
+    //
+    //
     //  manage-users
     app.get(
       "/manage-users/:email",
@@ -183,6 +240,39 @@ async function run() {
       }
     );
 
+    app.get('/admin-stat',verifyToken, verifyAdmin, async(req,res)=>{
+      //get total orders,total plants
+      const totalUser = await usersCollection.estimatedDocumentCount()
+      const totalPlants = await plantsCollection.countDocuments()
+
+      const allOrder = await ordersCollection.find().toArray()
+      const totalOrders = allOrder.length;
+      const totalPrice = allOrder.reduce((sum,order) =>sum+(order.price || 0),0)
+
+      //get total revenue,total order
+      const orderDetails = await ordersCollection.aggregate([
+        {$group:{
+          _id:null,  //not grouped by a specific field
+          totalRevenue:{$sum:"$price"},
+          totalOrder: {$sum:1}
+        },
+      },
+      {
+        $project:{
+          _id:0,
+        },
+      }
+      ]).next()
+
+
+      res.send({totalPlants,totalUser,totalOrders,totalPrice,...orderDetails})
+
+    })
+
+    // seller Routes ///////////////////////////////////////////////////////////////
+    //
+    //
+    //
     app.post("/plants", verifyToken, verifySeller, async (req, res) => {
       const plant = req.body;
       const result = await plantsCollection.insertOne(plant);
@@ -193,6 +283,7 @@ async function run() {
       const result = await plantsCollection.find().limit(12).toArray();
       res.send(result);
     });
+
     // get a plant by id
     app.get("/plants/:id", async (req, res) => {
       const id = req.params.id;
@@ -308,7 +399,7 @@ async function run() {
       async (req, res) => {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
-        const order = await ordersCollection.deleteOne(query);
+        const order = await ordersCollection.findOne(query);
         if (order.status === "Delivered")
           return res
             .status(409)
@@ -326,24 +417,30 @@ async function run() {
       res.send(result);
     });
 
-    //Manage plant quantify
+    //Manage plant quantify used for both seller and customer role
     app.patch("/plants/quantify/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
-      const { quantifyToUpdate, status } = req.body;
+      const { quantityToUpdate, status } = req.body;
       const filter = { _id: new ObjectId(id) };
       let updatedDoc = {
-        $inc: { quantity: -quantifyToUpdate },
+        $inc: { quantity: -quantityToUpdate },
       };
       if (status === "increase") {
         updatedDoc = {
-          $inc: { quantity: quantifyToUpdate },
+          $inc: { quantity: quantityToUpdate },
         };
       }
       const result = await plantsCollection.updateOne(filter, updatedDoc);
 
       res.send(result);
     });
-
+    
+    //  // // // /// // // // / //////////////////////////////////////////////////////////////////////////////
+    //Customer Routes
+    //
+    //
+    //
+    // 
     //get all orders from a specific customer
     app.get("/customer-orders/:email", verifyToken, async (req, res) => {
       try {
@@ -396,7 +493,27 @@ async function run() {
       }
     });
 
-    // delete orders
+    // request to become a  seller
+    app.patch("/users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user?.status === "Requested") {
+        return res
+          .status(400)
+          .send("You have already Requested, wait for some time");
+      }
+      const updatedDoc = {
+        $set: {
+          status: "Requested",
+        },
+      };
+      const result = await usersCollection.updateOne(user, updatedDoc);
+      res.send(result);
+    });
+
+    // delete orders customer route
     app.delete("/orders/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -409,6 +526,30 @@ async function run() {
       const result = await ordersCollection.deleteOne(query);
       res.send(result);
     });
+
+
+
+
+     // create payment intent
+    app.post('/create-payment-intent', verifyToken, async (req, res) => {
+      const { quantity, plantId } = req.body
+      const plant = await plantsCollection.findOne({
+        _id: new ObjectId(plantId),
+      })
+      if (!plant) {
+        return res.status(400).send({ message: 'Plant Not Found' })
+      }
+      const totalPrice = quantity * plant.price * 100 // total price in cent (poysha)
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: totalPrice,
+        currency: 'usd',
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      })
+      res.send({ clientSecret: client_secret })
+    })
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

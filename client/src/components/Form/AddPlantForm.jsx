@@ -1,7 +1,8 @@
 import PropTypes from "prop-types";
 import { TbFidgetSpinner } from "react-icons/tb";
+import { shortImageName } from "../../utilities";
 
-const AddPlantForm = ({handleSubmit, uploadButtonText,setUploadButtonText,loading}) => {
+const AddPlantForm = ({handleSubmit, uploadImage,setUploadImage,loading}) => {
 
   return (
     <div className='w-full min-h-[calc(100vh-40px)] flex flex-col justify-center items-center text-gray-800 rounded-xl bg-gray-50'>
@@ -91,7 +92,7 @@ const AddPlantForm = ({handleSubmit, uploadButtonText,setUploadButtonText,loadin
                 <div className='flex flex-col w-max mx-auto text-center'>
                   <label>
                     <input
-                      onChange = {e => setUploadButtonText({
+                      onChange = {e => setUploadImage({
                         image:e.target.files[0],
                         url: URL.createObjectURL(e.target.files[0]),
                       })}
@@ -103,18 +104,19 @@ const AddPlantForm = ({handleSubmit, uploadButtonText,setUploadButtonText,loadin
                       hidden
                     />
                     <div className='bg-lime-500 text-white border border-gray-300 rounded font-semibold cursor-pointer p-1 px-3 hover:bg-lime-500'>
-                     {uploadButtonText?.image?.name}
+                     {/* {uploadImage?.image?.name} */}
+                     {shortImageName(uploadImage?.image,15)}
                     </div>
                   </label>
                 </div>
               </div>
             </div>
             {
-                  uploadButtonText && uploadButtonText?.image?.size && 
+                  uploadImage && uploadImage?.image?.size && 
                   (
                    <div className=" flex items-center gap-5">
-                    <img className="w-20" src={uploadButtonText?.url} alt="" />
-                       <p>Image size: {parseInt(uploadButtonText?.image?.size/1024)} KB</p>
+                    <img className="w-20" src={uploadImage?.url} alt="" />
+                       <p>Image size: {parseInt(uploadImage?.image?.size/1024)} KB</p>
                     </div>
                   )
                 }
@@ -138,8 +140,8 @@ const AddPlantForm = ({handleSubmit, uploadButtonText,setUploadButtonText,loadin
 }
 AddPlantForm.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
-  uploadButtonText:PropTypes.object,
-  setUploadButtonText:PropTypes.func.isRequired,
+  uploadImage:PropTypes.object,
+  setUploadImage:PropTypes.func.isRequired,
   loading:PropTypes.bool,
 
 }

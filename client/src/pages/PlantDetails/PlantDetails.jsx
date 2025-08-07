@@ -8,11 +8,15 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import LoadingSpinner from "../../components/Shared/LoadingSpinner";
 import { useQuery } from "@tanstack/react-query";
+import useAuth from "../../hooks/useAuth";
+import useRole from "../../hooks/useRole";
 
 const PlantDetails = () => {
   const { id } = useParams();
   console.log(id);
   let [isOpen, setIsOpen] = useState(false);
+  const {user} = useAuth();
+  const [role] = useRole()
 
   const {
     data: plant = {},
@@ -111,6 +115,7 @@ const PlantDetails = () => {
               <Button
                 onClick={() => setIsOpen(true)}
                 label={quantity > 0 ? "purchase" : "Out Of Stock"}
+                disabled={ quantity === 0 || !user || role !='customer' ||user?.email === seller?.email}
               />
             </div>
           </div>

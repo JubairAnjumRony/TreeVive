@@ -9,20 +9,23 @@ import {
 } from "@headlessui/react";
 import { Fragment } from "react";
 import useAuth from "../../hooks/useAuth";
-import Button from "../Shared/Button/Button";
+
 import { useState } from "react";
 import toast from "react-hot-toast";
-import {  useNavigate } from "react-router-dom";
-import useAxiosSecure from "../../hooks/useAxiosSecure";
+import { Elements } from '@stripe/react-stripe-js'
+import { loadStripe } from '@stripe/stripe-js'
+import CheckoutForm from "../Form/CheckoutForm";
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
 
 const PurchaseModal = ({ closeModal, isOpen,plant,refetch }) => {
-  const axiosSecure = useAxiosSecure();
+  // const axiosSecure = useAxiosSecure();
   // Total Price Calculation
   const{name,category,price,quantity,seller,_id} =plant || {};
   const [totalQuantity,setTotalQuantity] = useState(1);
   const [totalPrice,setTotalPrice] =useState(price);
   const {user} = useAuth();
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [purchaseInfo,setPurchaseInfo]= useState({
     customer:{
       name:user?.displayName,
@@ -56,27 +59,27 @@ const PurchaseModal = ({ closeModal, isOpen,plant,refetch }) => {
     })
   }
   
-  const handlePurchase = async()=>{
-    console.table(setPurchaseInfo)
-    try{
-      await axiosSecure.post('/order',purchaseInfo)
-      //decrease quantify from plant collection
-      await axiosSecure.patch(`/plants/quantify/${_id}`,{
-        quantifyToUpdate: totalQuantity,
-        status:'decrease',
-      })
-      toast.success('order successful')
-      refetch()
-      navigate('/dashboard/my-orders')
-    }
-    catch(err){
-      console.log(err)
+  // const handlePurchase = async()=>{      
+  //   console.table(setPurchaseInfo)
+  //   try{
+  //     await axiosSecure.post('/order',purchaseInfo)
+  //     //decrease quantify from plant collection
+  //     await axiosSecure.patch(`/plants/quantify/${_id}`,{
+  //       quantifyToUpdate: totalQuantity,
+  //       status:'decrease',
+  //     })
+  //     toast.success('order successful')
+  //     refetch()
+  //     navigate('/dashboard/my-orders')
+  //   }
+  //   catch(err){
+  //     console.log(err)
     
-    }
-    finally{
-     closeModal()
-    }
-  }
+  //   }
+  //   finally{
+  //    closeModal()
+  //   }
+  // }
 
 
   return (
@@ -136,13 +139,13 @@ const PurchaseModal = ({ closeModal, isOpen,plant,refetch }) => {
                   </label>
                   <input
                   value={totalQuantity}
-                  onChange={(e=>handleQuantity(e.target.value))}
+                  onChange={(e=>handleQuantity(parseInt(e.target.value)))}
                   className="p-1 mt-2 text-gray-800 border border-lime-300 
                   focus:outline-lime-500 rounded-md bg-white"
                     name="quantity"
                     id="quantity"
-                    placeholder="Available Quantity"
                     type="number"
+                    placeholder="Available Quantity"
                     required
                   />
                 </div>
@@ -167,11 +170,16 @@ const PurchaseModal = ({ closeModal, isOpen,plant,refetch }) => {
                   />
                 </div>
 
-                 {/* purchase button */}
-                <div className="mt-3">
-                  <Button onClick={handlePurchase} label={`pay ${totalPrice}$`}></Button>
-                </div>
-
+                 {/*CheckOutForm */}
+                   <Elements stripe={stripePromise}>
+                  {/* Form component */}
+                  <CheckoutForm
+                    closeModal={closeModal}
+                    purchaseInfo={purchaseInfo}
+                    refetch={refetch}
+                    totalQuantity={totalQuantity}
+                  />
+                </Elements>
                 
               </DialogPanel>
             </TransitionChild>

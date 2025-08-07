@@ -62,14 +62,14 @@ const SellerOrderDataRow = ({ orderData,refetch }) => {
         <p className="text-gray-900 whitespace-no-wrap">{address}</p>
       </td>
       <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-        <p className="text-gray-900 whitespace-no-wrap">{status?.status}</p>
+        <p className="text-gray-900 whitespace-no-wrap">{status}</p>
       </td>
 
       <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
         <div className="flex items-center gap-2">
           <select
           defaultValue={status}
-          disabled= {status?.status === 'Delivered'}
+          // disabled= {status === 'Delivered'}
           onChange={e=>handleStatus(e.target.value)}
             required
             className="p-1 border-2 border-lime-300 focus:outline-lime-500 rounded-md text-gray-900 whitespace-no-wrap bg-white"

@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const AddPlant = () => {
   const { user } = useAuth();
-  const [uploadButtonText, setUploadButtonText] = useState({image:{name:'upload image'}});
+  const [uploadImage, setUploadImage] = useState({image:{name:'upload image'}});
   const [loading, setLoading] = useState(false);
   const axiosSecure = useAxiosSecure();
   const navigate  = useNavigate();
@@ -68,8 +68,8 @@ const AddPlant = () => {
       {/* Form */}
       <AddPlantForm
         handleSubmit={handleSubmit}
-        uploadButtonText={uploadButtonText}
-        setUploadButtonText={setUploadButtonText}
+        uploadImage={uploadImage}
+        setUploadImage={setUploadImage}
         loading={loading}
       />
     </div>
